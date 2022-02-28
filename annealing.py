@@ -3,7 +3,6 @@ import os
 import random
 import numpy as np
 import math
-import time
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -18,7 +17,6 @@ def parse_netlist(rel_path):
     """
     script_dir = os.path.dirname(__file__) #<-- absolute dir the script is in
 
-    # CHANGE FOLLOWING LINE FOR CHANGING THE INFILE
     abs_file_path = os.path.join(script_dir, rel_path)
     # reading in the file
     data = []
@@ -74,7 +72,6 @@ def get_netlist_cost(this_netlist, net_number, block_locations):
     # We calculate the distance between each block (e.g. 3 blocks have 2 distances: a->b, b->c)
     for i in range(int(this_netlist[net_number][0][0]) - 1):
         net_cost += calc_distance(this_netlist[net_number][0][i + 1], this_netlist[net_number][0][i + 2], block_locations)
-    #print("Cost for net " + str(net_number) + ": " + str(net_cost))
     return net_cost
 
 def calc_distance(block_1, block_2, block_locations):
@@ -142,7 +139,7 @@ def init_cell_placements(num_blocks, num_rows, num_connections, num_columns, net
     return block_locations
 
 def update_grid(block_locations, num_rows, num_columns, num_blocks):
-    """Prints a grid with the current location of the blocks
+    """Returns a grid with the current location of the blocks
 
     Args:
         block_locations (dict): contains the locations of each block in the format of:
@@ -151,13 +148,31 @@ def update_grid(block_locations, num_rows, num_columns, num_blocks):
         num_columns (int): number of columns in cell grid
 
     Returns:
-        (np array): numpy array containing location of blocks
+        grid (np array): numpy array containing location of blocks
     """
     grid = np.zeros((num_rows, num_columns))
     grid[:,:] = -1
     for i in range(num_blocks):
         grid[block_locations[i][0][0]][block_locations[i][0][1]] = i
 
+    return grid
+
+def update_grid_block_swap(grid, block_1, block_2, block_location_1, block_location_2):
+    """Updates the grid 
+
+    Args:
+        grid (np array): grid containing cell locations
+        block_1 (int): 1st block to be swapped
+        block_2 (int): 2nd block to be swapped
+        block_location_1 (list): location of block 1
+        block_location_2 (list): location of block 2
+
+    Returns:
+        grid (np array): numpy array containing location of blocks
+    """
+
+    grid[block_location_1[0]][block_location_1[1]] = block_2
+    grid[block_location_2[0]][block_location_2[1]] = block_1
     return grid
 
 def get_initial_cost(new_netlist, block_locations, num_connections):
@@ -195,8 +210,6 @@ def get_block_cost(new_netlist, block_locations, block):
     for i in range(len(block_locations[block][1])):
         curr_cost = new_netlist[block_locations[block][1][i]][1]
         total_cost += curr_cost
-        #print(new_netlist[block_locations[block][1][i]])
-        #print("current_cost: " + str(curr_cost) + ", block_locations: " + str(block_locations[block][1][i]) + ", block: " + str(block))
     return total_cost
 
 def update_netlist_values(block_to_swap_1, block_to_swap_2, netlist, block_locations, num_connections):
@@ -207,7 +220,8 @@ def update_netlist_values(block_to_swap_1, block_to_swap_2, netlist, block_locat
         block_to_swap_2 (int): block 2 that was swapped
         netlist (list): the key is the net number, the 1st list associated is the respective net, the 2nd list
                         contains the cost of the given net 
-        block_locations (list): [description]
+        block_locations (dict): contains the locations of each block in the format of:
+                                block: [[current_cell_x, current_cell_y], [associated netlist nets]]
     Returns:
         netlist (list): netlist with updated cost for updated block locations 
     """
@@ -227,7 +241,25 @@ def swap_back(block_locations, block_to_swap_1, block_to_swap_2):
     return block_locations
 
 def swap_block_locations(block_locations, netlist, block_to_swap_1, block_to_swap_2):
-    print("Block 1: " + str(block_to_swap_1) + ", Block 2: " + str(block_to_swap_2))
+    """Swaps the location of 2 blocks in the block_locations list
+
+    Args:
+        block_locations (dict): contains the locations of each block in the format of:
+                                block: [[current_cell_x, current_cell_y], [associated netlist nets]]
+        netlist (list): netlist with updated cost for updated block locations 
+        block_to_swap_1 (int): The first block number to be swapped
+        block_to_swap_2 (int): The second block number to be swapped
+
+    Returns:
+        block_locations (dict): contains the locations of each block in the format of:
+                                block: [[current_cell_x, current_cell_y], [associated netlist nets]]
+                                updated with swapped blocks
+        block1_cost: Sum of the associated netlist values
+        block2_cost: Sum of the associated netlist values
+        new_block_1_cost: Sum of the associated netlist values post swap
+        new_block_2_cost: Sum of the assocciated netlist values post swap
+    """
+    # print("Block 1: " + str(block_to_swap_1) + ", Block 2: " + str(block_to_swap_2))
 
     temp_block_1 = deepcopy(block_locations[block_to_swap_1][0])
     temp_block_2 = deepcopy(block_locations[block_to_swap_2][0])
@@ -249,39 +281,109 @@ def swap_block_locations(block_locations, netlist, block_to_swap_1, block_to_swa
     return block_locations, block1_cost, block2_cost, new_block_1_cost, new_block_2_cost
 
 def sum_cost(netlist):
+    """_summary_
+
+    Args:
+        netlist (list): netlist (list): netlist with updated cost for updated block locations 
+
+    Returns:
+        sum (int): total cost
+    """
     sum = 0
     for i in range(len(netlist)):
         sum += netlist[i][1]
     return sum
 
+def range_window_select(block_1_location, window_size, grid, block_locations):
+    max_height = len(grid) - 1
+    max_width = len(grid[0]) - 1
+    x_relative = random.randint(-window_size, window_size)
+    y_relative = random.randint(-window_size, window_size)
+    while (x_relative == 0 and y_relative == 0):
+        x_relative = random.randint(-window_size, window_size)
+        y_relative = random.randint(-window_size, window_size)
+
+    new_row = block_1_location[0] + x_relative
+    new_column = block_1_location[1] + y_relative
+
+    # ensure our new block is within the x and y bounds of the circuit
+    x_location = max( min(new_column, max_width), 0)
+    y_location = max( min(new_row, max_height), 0)
+
+    new_block = grid[y_location][x_location]
+    if (new_block == -1):
+        for i in range(len(block_locations)):
+            if(block_locations[i][0] == [y_location, x_location]):
+                new_block = i
+                break
+
+    return new_block
+
 def main():
 
-    random.seed(4)
     # Parsing the initial input file and getting the initial cost set up
-    netlist = parse_netlist("ass2_files/cm138a.txt")
-    num_blocks, num_connections, num_rows, num_columns, netlist = get_values(netlist)
-    block_locations = init_cell_placements(num_blocks, num_rows, num_connections, num_columns, netlist)
-    netlist, initial_cost = get_initial_cost(netlist, block_locations, num_connections)
+    initial_cost = 999999999
+    block_locations = []
+    netlist = []
+    # Try a few placements to see which is the best to start in
+    for i in range(50):
+        # Change the next line to change the input file
+        new_netlist = parse_netlist("ass2_files/alu2.txt")
+        num_blocks, num_connections, num_rows, num_columns, new_netlist = get_values(new_netlist)
+        new_block_locations = init_cell_placements(num_blocks, num_rows, num_connections, num_columns, new_netlist)
+        new_netlist, new_cost = get_initial_cost(new_netlist, new_block_locations, num_connections)
+        print(new_cost)
+        if (new_cost < initial_cost):
+            netlist = deepcopy(new_netlist)
+            block_locations = deepcopy(new_block_locations)
+            initial_cost = deepcopy(new_cost)
 
     # Can print the grid to get an idea of what the cells look like
     grid = update_grid(block_locations, num_rows, num_columns, num_blocks)
-
     current_cost = deepcopy(initial_cost)
-    temperature = 20
+    temperature = 22
     iterations_per_temp = num_connections
-    N_iterations = math.ceil(10 * math.pow(iterations_per_temp, 1.33))
-    current_cost_array = np.zeros((21, 1))
-    # setting up the environment for blit plotting
-    x = np.arange(0, 21, 1)
-    
+    print("num connections: " + str(num_connections))
+    N_iterations = math.ceil(20 * math.pow(iterations_per_temp, 1.33))
+    print("number of iterations per temp: " + str(N_iterations))
+    current_cost_array = []
+    current_temperature_array = []
+
+    # plotting
+    x = []
+    fig, ax1 = plt.subplots()
+    ax2 = ax1.twinx()
+    plt.title("Cost vs. Number of Steps")
+    ax1.set_xlabel("Number of Steps")
+    ax1.set_ylabel("Cost (Total Wirelength)", c="red")
+    ax2.set_ylabel("Temperature", c="blue")
+    accepted_move_percentages = []
+    plt.ion()
     i = 0
-    while (temperature > 2):
+    temp_threshold = .7
+
+    # 3x3 window (1 on either side)
+    window_size = max(num_columns, num_rows)
+    
+    while (temperature > temp_threshold or temperature == 0):
+        number_moves_accepted = 0
+
         for _ in range(N_iterations):
-            # print("CURRENT ITERATION: " + str(i))
-            # Ensures we're swapping an occupied cell
+            # ================ Next 4 lines are for standard annealing (no range windows) ==============
+            # # Ensures we're swapping an occupied cell
+            # block_to_swap_1 = random.randint(0, num_connections - 1)
+            # # Can potentially swap occupied cell with an unoccupied cell
+            # block_to_swap_2 = random.randint(0, num_columns * num_rows - 1)
+            # ================ end of standard annealing ===============
+
+            # ================ next 4 lines are for range windows==================
+
             block_to_swap_1 = random.randint(0, num_connections - 1)
-            # Can potentially swap occupied cell with an unoccupied cell
-            block_to_swap_2 = random.randint(0, num_columns * num_rows - 1)
+            block_1_location = block_locations[block_to_swap_1][0]
+            block_to_swap_2 = range_window_select(block_1_location, window_size, grid, block_locations)
+            block_2_location = block_locations[block_to_swap_1][0]
+            
+            #================= end range windows =================================
 
             # Make sure their values aren't the same
             while block_to_swap_1 == block_to_swap_2:
@@ -299,7 +401,9 @@ def main():
             rand_val = random.random()
             
             # accepting all good moves, and accepting some of the bad ones
-            if ((change_in_cost < 0) or (rand_val < math.exp((-1) * (change_in_cost) / temperature))):
+            if ((change_in_cost < 0) or ((temperature != 0) and (rand_val < math.exp((-1) * (change_in_cost / temperature))))):
+                grid = update_grid_block_swap(grid, block_to_swap_1, block_to_swap_2, block_1_location, block_2_location)
+                number_moves_accepted += 1
                 current_cost = sum_cost(netlist)
                 # don't need to update block locations, just need to update netlist with new values for each net:
                 netlist, block_locations = update_netlist_values(block_to_swap_1, block_to_swap_2, netlist, block_locations, num_connections)
@@ -307,19 +411,43 @@ def main():
                 # need to switch the blocks back (netlist was unmodified) back
                 block_locations = swap_back(block_locations, block_to_swap_1, 
                                             block_to_swap_2)
-            print(current_cost)
-        temperature *= .8
-        print(temperature)
-        time.sleep(3)
-    current_cost_array[i] = current_cost
-    
-    
-    # print(netlist)
-    # print(block_locations)
-    # print(update_grid(block_locations, num_rows, num_columns, num_blocks))
-    # print("num rows: " + str(num_rows))
-    # print("num cols: " + str(num_columns))
 
+        accepted_move_percentages.append(number_moves_accepted/N_iterations)
+        current_cost_array.append(current_cost)
+        current_temperature_array.append(temperature)
+
+        # ====================== just for range windows ===========================
+        if(number_moves_accepted/N_iterations < .40):
+            window_size -= int(math.pow((max(num_columns, num_rows)), 1/3))
+        if(number_moves_accepted/N_iterations > .50):
+            window_size += int(math.pow((max(num_columns, num_rows)), 1/3))
+        if(window_size < 1):
+            window_size = 1
+        if(window_size > max(num_rows, num_columns)):
+            window_size = max(num_rows, num_columns)
+        # ====================== range window ends =========================
+
+        print(accepted_move_percentages[-1])
+        x.append(i)
+        ax1.scatter(i, current_cost, c="Red")
+        ax1.plot(x, current_cost_array, c="red", linestyle='-')
+        ax2.plot(x, current_temperature_array, c="Blue")
+        plt.pause(0.1)
+        print("temperature: " + str(temperature))
+        temperature *= .95
+        if(temperature == 0):
+            break
+        if((temperature < temp_threshold) or (accepted_move_percentages[i] < .001)):
+            temperature = 0
+            N_iterations = math.ceil(100 * math.pow(iterations_per_temp, 1.33))
+        
+
+        i += 1
+        # print(temperature)
+    print("accepted move percentages: " + str(accepted_move_percentages))
+    plt.pause(10)
+    print(update_grid(block_locations, num_rows, num_columns, num_blocks))
+    print("Final Cost: " + str(current_cost_array[-1]))
     
 main()
 
