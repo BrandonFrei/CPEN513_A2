@@ -51,7 +51,7 @@ def get_values(netlist):
     new_netlist = {}
     for i in range(num_connections):
         new_netlist[int(i)] = []
-        new_netlist[int(i)].append(netlist[i])
+        new_netlist[int(i)].append(netlist[i][1:])
         new_netlist[int(i)].append([])
     return num_blocks, num_connections, num_rows, num_columns, new_netlist
 
@@ -70,8 +70,9 @@ def get_netlist_cost(this_netlist, net_number, block_locations):
     """
     net_cost = 0
     # We calculate the distance between each block (e.g. 3 blocks have 2 distances: a->b, b->c)
-    for i in range(int(this_netlist[net_number][0][0]) - 1):
-        net_cost += calc_distance(this_netlist[net_number][0][i + 1], this_netlist[net_number][0][i + 2], block_locations)
+    # print(this_netlist[net_number][0][0] - 1)
+    for i in range(int(len(this_netlist[net_number][0])) - 1):
+        net_cost += calc_distance(this_netlist[net_number][0][i], this_netlist[net_number][0][i + 1], block_locations)
     return net_cost
 
 def calc_distance(block_1, block_2, block_locations):
@@ -328,8 +329,9 @@ def main():
     # Try a few placements to see which is the best to start in
     for i in range(50):
         # Change the next line to change the input file
-        new_netlist = parse_netlist("ass2_files/alu2.txt")
+        new_netlist = parse_netlist("ass2_files/cm138a.txt")
         num_blocks, num_connections, num_rows, num_columns, new_netlist = get_values(new_netlist)
+        # print(new_netlist)
         new_block_locations = init_cell_placements(num_blocks, num_rows, num_connections, num_columns, new_netlist)
         new_netlist, new_cost = get_initial_cost(new_netlist, new_block_locations, num_connections)
         print(new_cost)
@@ -337,6 +339,10 @@ def main():
             netlist = deepcopy(new_netlist)
             block_locations = deepcopy(new_block_locations)
             initial_cost = deepcopy(new_cost)
+    print("netlist: ")
+    print(netlist)
+    print("block locations: ")
+    print(block_locations)
 
     # Can print the grid to get an idea of what the cells look like
     grid = update_grid(block_locations, num_rows, num_columns, num_blocks)
@@ -401,7 +407,7 @@ def main():
             rand_val = random.random()
             
             # accepting all good moves, and accepting some of the bad ones
-            if ((change_in_cost < 0) or ((temperature != 0) and (rand_val < math.exp((-1) * (change_in_cost / temperature))))):
+            if ((temperature == 0 and change_in_cost > 0) or ((temperature != 0) and (rand_val < math.exp((-1) * (change_in_cost / temperature))))):
                 grid = update_grid_block_swap(grid, block_to_swap_1, block_to_swap_2, block_1_location, block_2_location)
                 number_moves_accepted += 1
                 current_cost = sum_cost(netlist)
@@ -434,8 +440,8 @@ def main():
         ax2.plot(x, current_temperature_array, c="Blue")
         plt.pause(0.1)
         print("temperature: " + str(temperature))
-        temperature *= .95
-        if(temperature == 0):
+        temperature *= .9
+        if(temperature < temp_threshold):
             break
         if((temperature < temp_threshold) or (accepted_move_percentages[i] < .001)):
             temperature = 0
