@@ -71,8 +71,27 @@ def get_netlist_cost(this_netlist, net_number, block_locations):
     net_cost = 0
     # We calculate the distance between each block (e.g. 3 blocks have 2 distances: a->b, b->c)
     # print(this_netlist[net_number][0][0] - 1)
-    for i in range(int(len(this_netlist[net_number][0])) - 1):
-        net_cost += calc_distance(this_netlist[net_number][0][i], this_netlist[net_number][0][i + 1], block_locations)
+    max_x = -9999999
+    min_x = 999999
+    max_y = -9999999
+    min_y = 999999
+    for i in range(int(len(this_netlist[net_number][0]))):
+        x_loc = (block_locations[this_netlist[net_number][0][i]][0][0])
+        y_loc = (block_locations[this_netlist[net_number][0][i]][0][1])
+        if (x_loc > max_x):
+            max_x = x_loc
+        if (x_loc < min_x):
+            min_x = x_loc
+        if (y_loc > max_y):
+            max_y = y_loc
+        if (y_loc < min_y):
+            min_y = y_loc
+    distance_x = abs(max_x - min_x)
+    distance_y = abs(max_y - min_y)
+    net_cost = distance_x + distance_y
+
+    # for i in range(int(len(this_netlist[net_number][0])) - 1):
+    #     net_cost += calc_distance(this_netlist[net_number][0][i], this_netlist[net_number][0][i + 1], block_locations)
     return net_cost
 
 def calc_distance(block_1, block_2, block_locations):
@@ -329,7 +348,7 @@ def main():
     # Try a few placements to see which is the best to start in
     for i in range(50):
         # Change the next line to change the input file
-        new_netlist = parse_netlist("ass2_files/cm138a.txt")
+        new_netlist = parse_netlist("ass2_files/apex1.txt")
         num_blocks, num_connections, num_rows, num_columns, new_netlist = get_values(new_netlist)
         # print(new_netlist)
         new_block_locations = init_cell_placements(num_blocks, num_rows, num_connections, num_columns, new_netlist)
